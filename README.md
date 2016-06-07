@@ -5,26 +5,30 @@ Vim plugin for linux kernel study
 Put a file `checksymbol.vim` into `$HOME/.vim/plugin`
 
 # Keyboard shortcut
-`<C-c>` : Display hexadecimal and binary values or Check current kernel configuration (.config)
+`<CR>` : Display hexadecimal and binary values
+
+         Check current kernel configuration (.config)
+
+         Jump to the definition of the keyword (tag)
 
 `\`   : C-style calculator
 
         ex) 0x1234 & ((1 << 12) -1)
 
 ##  GIT features
-`<C-g>` : blame (support visual block)
+`gb` : blame (support visual block)
 
 `gl`    : logs (support visual block)
 
-`<CR>`  : select log, commit
+`<CR>`  : select log, show diff
 
 `d`     : show diff
 
-`D`     : show all changeset
-
-`]`     : find next
+`s`     : show all changeset
 
 `[`     : find previous
+
+`]`     : find next
 
 `q`     : close window
 

@@ -1,17 +1,18 @@
-" Linux symbol checker 0.56
+" Symbol checker 0.57
 " ====================================================
-" '<C-c>' : Display hexadecimal and binary values
-"         Check current kernel configuration (.config)
+" '<CR>' : Display hexadecimal and binary values
+"          Check current kernel configuration (.config)
+"          Jump to the definition of the keyword (tag)
 " '\'   : C-style calculator
 "         ex) 0x1234 & ((1 << 12) -1)
 " =================== GIT features ===================
-" '<C-g>' : blame (support visual block)
+" 'gb'    : blame (support visual block)
 " 'gl'    : logs (support visual block)
-" '<CR>'  : select log, commit
+" '<CR>'  : select log, show diff
 " 'd'     : show diff
-" 'D'     : show all changeset
-" ']'     : find next
+" 's'     : show all changeset
 " '['     : find previous
+" ']'     : find next
 " 'q'     : close window
 " ===================== OPTIONS =====================
 " let g:git_window = [vert, hori(default), none]
@@ -163,10 +164,18 @@ fu! CheckSymbol(var)
 		else
 			echo "config file not found"
 		endif
+	elseif sym =~? '^\(#\|=\)\?\([0-9]\+\|0x[0-9a-f]\+\)$'
+		if sym =~ '^\(=\|#\)' | let sym = sym[1:] | endif
+		echo NumFmt(sym)
 	else
-		if sym =~? '^\(#\|=\)\?\([0-9]\+\|0x[0-9a-f]\+\)$'
-			if sym =~ '^\(=\|#\)' | let sym = sym[1:] | endif
-			echo NumFmt(sym)
+		if &l:cscopetag == 0
+			let v:errmsg = ""
+			silent! exec "ta " . sym
+			if v:errmsg == ""
+				:0tn
+			endif
+		else
+			exec "ta " . sym
 		endif
 	endif
 endfu
@@ -377,12 +386,12 @@ fu! GitBlame() range
 		call GitExec('git blame -L ' . a:firstline .','. a:lastline .' '. b:file)
 	endif
 	setl cursorline
-	map <silent> <buffer> d :call GitShow(GetHash(),1)<CR>
-	map <silent> <buffer> D :call GitShow(GetHash(),0)<CR>
-	map <silent> <buffer> ] :call FindHash(1)<CR>
-	map <silent> <buffer> [ :call FindHash(-1)<CR>
-	map <silent> <buffer> <CR> :call GitLog(GetHash())<CR>
-	map <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> ] :call FindHash(1)<CR>
+	noremap <silent> <buffer> [ :call FindHash(-1)<CR>
+	noremap <silent> <buffer> s 0:call GitShow(GetHash(),0)<CR>
+	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
+	noremap <silent> <buffer> <CR> 0:call GitLog(GetHash())<CR>
+	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
 endfu
 
 fu! ValidHash(hash)
@@ -445,12 +454,12 @@ fu! GitLog(hash)
 	if GitNewWindow() < 0 | return | endif
 	call GitExec('git show -s ' . a:hash)
 	setl syntax=git
-	map <silent> <buffer> d :call GitShow(GetHash(),1)<CR>
-	map <silent> <buffer> D :call GitShow(GetHash(),0)<CR>
-	map <silent> <buffer> [ :call GitPrev("^commit ")<CR>
-	map <silent> <buffer> ] :call GitNext("^commit ")<CR>
-	map <silent> <buffer> <CR> :call GitShow(GetHash(),1)<CR>
-	map <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> [ :call GitPrev("^commit ")<CR>
+	noremap <silent> <buffer> ] :call GitNext("^commit ")<CR>
+	noremap <silent> <buffer> s 0:call GitShow(GetHash(),0)<CR>
+	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
+	noremap <silent> <buffer> <CR> 0:call GitShow(GetHash(),1)<CR>
+	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
 endfu
 
 fu! GitFullLog() range
@@ -467,12 +476,12 @@ fu! GitFullLog() range
 	endif
 
 	setl syntax=git
-	map <silent> <buffer> [ :call GitPrev("^commit ")<CR>
-	map <silent> <buffer> ] :call GitNext("^commit ")<CR>
-	map <silent> <buffer> d :call GitShow(GetHash(),1)<CR>
-	map <silent> <buffer> D :call GitShow(GetHash(),0)<CR>
-	map <silent> <buffer> <CR> :call GitShow(GetHash(),1)<CR>
-	map <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> [ :call GitPrev("^commit ")<CR>
+	noremap <silent> <buffer> ] :call GitNext("^commit ")<CR>
+	noremap <silent> <buffer> s 0:call GitShow(GetHash(),0)<CR>
+	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
+	noremap <silent> <buffer> <CR> 0:call GitShow(GetHash(),1)<CR>
+	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
 endfu
 
 fu! GitShow(hash, isFile)
@@ -491,12 +500,12 @@ fu! GitShow(hash, isFile)
 
 	call GitExec('git show --format=oneline -p ' . a:hash . ' ' . l:opts)
 	setl syntax=diff
-	map <silent> <buffer> [ :call GitPrev("^diff ")<CR>
-	map <silent> <buffer> ] :call GitNext("^diff ")<CR>
-	map <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> [ :call GitPrev("^diff ")<CR>
+	noremap <silent> <buffer> ] :call GitNext("^diff ")<CR>
+	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
 endfu
 
-nmap <silent> \ :call Calc(input("Calculate: "))<CR>
-nmap <silent> <C-c> :call CheckSymbol(expand("<cword>"))<CR>
-map <silent> <C-g> :call GitBlame()<CR>
-map <silent> gl :call GitFullLog()<CR>
+nnoremap <silent> \ :call Calc(input("Calculate: "))<CR>
+nnoremap <silent> <CR> :call CheckSymbol(expand("<cword>"))<CR>
+noremap <silent> gb :call GitBlame()<CR>
+noremap <silent> gl :call GitFullLog()<CR>
