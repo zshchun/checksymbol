@@ -1,4 +1,4 @@
-" Symbol checker 0.57
+" Symbol checker 0.58
 " ====================================================
 " '<CR>' : Display hexadecimal and binary values
 "          Check current kernel configuration (.config)
@@ -11,6 +11,7 @@
 " '<CR>'  : select log, show diff
 " 'd'     : show diff
 " 's'     : show all changeset
+" 'f'     : show a file
 " '['     : find previous
 " ']'     : find next
 " 'q'     : close window
@@ -332,7 +333,7 @@ fu! GitResize()
 	endif
 endfu
 
-fu! GitNewWindow()
+fu! GitNewWindow(title)
 	if exists('b:file')
 		let l:path = b:path
 		let l:file = b:file
@@ -340,8 +341,8 @@ fu! GitNewWindow()
 		if empty(expand("%:t"))
 			return -1
 		endif
-		let l:path = expand("%:p:h")
-		let l:file = expand("%:t")
+		let l:path = fnameescape(expand("%:p:h"))
+		let l:file = fnameescape(expand("%:t"))
 	endif
 
 	if g:git_window == "none"
@@ -357,6 +358,16 @@ fu! GitNewWindow()
 	let b:path = l:path
 	let b:file = l:file
 	setl incsearch
+
+	let l:bufproto = a:title . ":" . b:file
+	let l:buf= l:bufproto
+	let l:cnt = 0
+
+	while bufwinnr(l:buf) > 0
+		let l:cnt += 1
+		let l:buf = l:bufproto . "-" . l:cnt
+	endwh
+	exec "file " . l:buf
 	return 0
 endfu
 
@@ -365,7 +376,7 @@ fu! GitExec(cmd)
 		lcd `=b:path`
 		let l:cmd_cd = ""
 	else
-		let l:cmd_cd = "cd \"" . b:path . "\";"
+		let l:cmd_cd = "cd " . b:path . ";"
 	endif
 
 	silent! execute "0read ! " . l:cmd_cd . a:cmd
@@ -374,7 +385,7 @@ endfu
 
 fu! GitBlame() range
 	let l:line = line(".")
-	if GitNewWindow() < 0
+	if GitNewWindow("git-blame") < 0
 		echo "File not found"
 		return
 	endif
@@ -388,7 +399,8 @@ fu! GitBlame() range
 	setl cursorline
 	noremap <silent> <buffer> ] :call FindHash(1)<CR>
 	noremap <silent> <buffer> [ :call FindHash(-1)<CR>
-	noremap <silent> <buffer> s 0:call GitShow(GetHash(),0)<CR>
+	noremap <silent> <buffer> f 0:call GitFile(GetHash())<CR>
+	noremap <silent> <buffer> s 0:call GitShow(GetHash())<CR>
 	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
 	noremap <silent> <buffer> <CR> 0:call GitLog(GetHash())<CR>
 	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
@@ -451,12 +463,13 @@ endfu
 
 fu! GitLog(hash)
 	if ValidHash(a:hash) < 0  | return | endif
-	if GitNewWindow() < 0 | return | endif
+	if GitNewWindow("git-log") < 0 | return | endif
 	call GitExec('git show -s ' . a:hash)
 	setl syntax=git
 	noremap <silent> <buffer> [ :call GitPrev("^commit ")<CR>
 	noremap <silent> <buffer> ] :call GitNext("^commit ")<CR>
-	noremap <silent> <buffer> s 0:call GitShow(GetHash(),0)<CR>
+	noremap <silent> <buffer> f 0:call GitFile(GetHash())<CR>
+	noremap <silent> <buffer> s 0:call GitShow(GetHash())<CR>
 	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
 	noremap <silent> <buffer> <CR> 0:call GitShow(GetHash(),1)<CR>
 	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
@@ -468,7 +481,7 @@ fu! GitFullLog() range
 	else
 		let l:opts = ''
 	endif
-	if GitNewWindow() < 0 | return | endif
+	if GitNewWindow("git-log") < 0 | return | endif
 	if a:firstline == a:lastline
 		call GitExec('git log ' . l:opts . b:file)
 	else
@@ -478,30 +491,36 @@ fu! GitFullLog() range
 	setl syntax=git
 	noremap <silent> <buffer> [ :call GitPrev("^commit ")<CR>
 	noremap <silent> <buffer> ] :call GitNext("^commit ")<CR>
-	noremap <silent> <buffer> s 0:call GitShow(GetHash(),0)<CR>
+	noremap <silent> <buffer> f 0:call GitFile(GetHash())<CR>
+	noremap <silent> <buffer> s 0:call GitShow(GetHash())<CR>
 	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
 	noremap <silent> <buffer> <CR> 0:call GitShow(GetHash(),1)<CR>
 	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
 endfu
 
-fu! GitShow(hash, isFile)
+fu! GitShow(hash, ...)
 	if ValidHash(a:hash) < 0  | return | endif
 	if !exists('g:git_merges') || g:git_merges != 0
 		let l:opts = ' -m '
 	else
 		let l:opts = ''
 	endif
-	if GitNewWindow() < 0 | return | endif
+	if GitNewWindow("git-show") < 0 | return | endif
 
-	if a:isFile != 0
-		let l:opts .= b:file
-	else
-	endif
+	if a:0 > 0 | let l:opts .= b:file | endif
 
 	call GitExec('git show --format=oneline -p ' . a:hash . ' ' . l:opts)
 	setl syntax=diff
 	noremap <silent> <buffer> [ :call GitPrev("^diff ")<CR>
 	noremap <silent> <buffer> ] :call GitNext("^diff ")<CR>
+	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+endfu
+
+fu! GitFile(hash)
+	if ValidHash(a:hash) < 0  | return | endif
+	if GitNewWindow(a:hash) < 0 | return | endif
+
+	call GitExec('git show -p ' . a:hash . ':./' . b:file)
 	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
 endfu
 

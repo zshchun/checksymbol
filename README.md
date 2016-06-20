@@ -26,6 +26,8 @@ Put a file `checksymbol.vim` into `$HOME/.vim/plugin`
 
 `s`     : show all changeset
 
+`f`     : show specific revision of a file
+
 `[`     : find previous
 
 `]`     : find next
