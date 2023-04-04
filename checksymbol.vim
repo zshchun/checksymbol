@@ -1,4 +1,4 @@
-" Symbol checker 0.58
+" Symbol checker 0.59
 " ====================================================
 " '<CR>' : Display hexadecimal and binary values
 "          Check current kernel configuration (.config)
@@ -7,6 +7,8 @@
 "         ex) 0x1234 & ((1 << 12) -1)
 " =================== GIT features ===================
 " 'gb'    : blame (support visual block)
+" 'gc'    : checkout
+" 'gd'    : diff
 " 'gl'    : logs (support visual block)
 " '<CR>'  : select log, show diff
 " 'd'     : show diff
@@ -165,10 +167,11 @@ fu! CheckSymbol(var)
 		else
 			echo "config file not found"
 		endif
-	elseif sym =~? '^\(#\|=\)\?\([0-9]\+\|0x[0-9a-f]\+\)$'
+	elseif sym =~? '^\(#\|=\)\?-\?\([0-9]\+\|0x[0-9a-f]\+\)$'
 		if sym =~ '^\(=\|#\)' | let sym = sym[1:] | endif
 		echo NumFmt(sym)
 	else
+		let sym = expand('<cword>')
 		if &l:cscopetag == 0
 			let v:errmsg = ""
 			silent! exec "ta " . sym
@@ -498,6 +501,28 @@ fu! GitFullLog() range
 	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
 endfu
 
+fu! GitDiff(branch)
+	if GitNewWindow("git-diff") < 0 | return | endif
+	if exists('b:file')
+		call GitExec('git diff ' . a:branch . ' ' . b:file)
+	else
+		call GitExec('git diff ' . a:branch)
+	endif
+
+	setl syntax=git
+	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+endfu
+
+fu! GitCheckout(branch)
+	if GitNewWindow("git-checkout") < 0 | return | endif
+	if a:branch == ""
+		return -1
+	endif
+
+	call GitExec('git checkout ' . a:branch)
+	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+endfu
+
 fu! GitShow(hash, ...)
 	if ValidHash(a:hash) < 0  | return | endif
 	if !exists('g:git_merges') || g:git_merges != 0
@@ -525,6 +550,8 @@ fu! GitFile(hash)
 endfu
 
 nnoremap <silent> \ :call Calc(input("Calculate: "))<CR>
-nnoremap <silent> <CR> :call CheckSymbol(expand("<cword>"))<CR>
+nnoremap <silent> <CR> :call CheckSymbol(expand("<cWORD>"))<CR>
 noremap <silent> gb :call GitBlame()<CR>
+noremap <silent> gc :call GitCheckout(input("Checkout Branch: "))<CR>
+noremap <silent> gd :call GitDiff(input("Diff Branch: "))<CR>
 noremap <silent> gl :call GitFullLog()<CR>
