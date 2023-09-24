@@ -1,15 +1,17 @@
-" Symbol checker 0.59
+" Symbol checker 0.60
 " ====================================================
 " '<CR>' : Display hexadecimal and binary values
 "          Check current kernel configuration (.config)
 "          Jump to the definition of the keyword (tag)
-" '\'   : C-style calculator
+" 'g\'   : C-style calculator
 "         ex) 0x1234 & ((1 << 12) -1)
 " =================== GIT features ===================
 " 'gb'    : blame (support visual block)
-" 'gc'    : checkout
 " 'gd'    : diff
+" 'gD'    : diff current changes
+" 'gc'    : checkout
 " 'gl'    : logs (support visual block)
+" 'gL'    : logs all changes
 " '<CR>'  : select log, show diff
 " 'd'     : show diff
 " 's'     : show all changeset
@@ -22,6 +24,7 @@
 " let g:git_resize = [vert, hori, both(default), none]
 " let g:git_scroll = [top, center(default), none]
 " let g:git_merges = [0, 1(default)]
+" let g:git_max_logs = 1000
 
 let s:nibble = ["0000", "0001", "0010", "0011", "0100", "0101", "0110", "0111", "1000", "1001", "1010", "1011", "1100", "1101", "1110", "1111"]
 
@@ -35,6 +38,7 @@ if !exists('g:git_window') | let g:git_window = "hori" | endif
 if !exists('g:git_resize') | let g:git_resize = "both" | endif
 if !exists('g:git_scroll') | let g:git_scroll = "center" | endif
 if !exists('g:git_merges') | let g:git_merges = 1 | endif
+if !exists('g:git_max_logs') | let g:git_max_logs = 1000 | endif
 
 fu! Bitwise(var1, var2, one, two)
 	let b1 = Num2Bin(a:var1)
@@ -324,6 +328,7 @@ fu! Calc(var)
 		echohl None
 	endif
 endfu
+
 fu! GitResize()
 	if g:git_resize == "none"
 
@@ -334,6 +339,11 @@ fu! GitResize()
 	else
 		vert res | res
 	endif
+endfu
+
+fu! GitCloseWindow()
+	clo
+	winc =
 endfu
 
 fu! GitNewWindow(title)
@@ -386,6 +396,13 @@ fu! GitExec(cmd)
 	setl noma | 1
 endfu
 
+fu! CloseAndGotoLine() range
+	let l:line = line(".")
+	close
+	call GitResize()
+	exec l:line
+endfu
+
 fu! GitBlame() range
 	let l:line = line(".")
 	if GitNewWindow("git-blame") < 0
@@ -405,8 +422,9 @@ fu! GitBlame() range
 	noremap <silent> <buffer> f 0:call GitFile(GetHash())<CR>
 	noremap <silent> <buffer> s 0:call GitShow(GetHash())<CR>
 	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
+	noremap <silent> <buffer> l :call CloseAndGotoLine()<CR>
 	noremap <silent> <buffer> <CR> 0:call GitLog(GetHash())<CR>
-	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
 endfu
 
 fu! ValidHash(hash)
@@ -475,20 +493,19 @@ fu! GitLog(hash)
 	noremap <silent> <buffer> s 0:call GitShow(GetHash())<CR>
 	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
 	noremap <silent> <buffer> <CR> 0:call GitShow(GetHash(),1)<CR>
-	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
 endfu
 
 fu! GitFullLog() range
+	let l:opts = ' -n ' . g:git_max_logs . ' '
 	if exists('g:git_merges') && g:git_merges == 0
-		let l:opts = ' --no-merges '
-	else
-		let l:opts = ''
+		let l:opts += ' --no-merges '
 	endif
 	if GitNewWindow("git-log") < 0 | return | endif
 	if a:firstline == a:lastline
 		call GitExec('git log ' . l:opts . b:file)
 	else
-		call GitExec('git log -L ' . a:firstline .','. a:lastline .':'. b:file . ' ' . l:opts)
+		call GitExec('git log ' . l:opts . '-L ' . a:firstline .','. a:lastline .':'. b:file)
 	endif
 
 	setl syntax=git
@@ -498,7 +515,25 @@ fu! GitFullLog() range
 	noremap <silent> <buffer> s 0:call GitShow(GetHash())<CR>
 	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
 	noremap <silent> <buffer> <CR> 0:call GitShow(GetHash(),1)<CR>
-	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
+endfu
+
+fu! GitFullLogAll()
+	let l:opts = ' -n ' . g:git_max_logs . ' '
+	if exists('g:git_merges') && g:git_merges == 0
+		let l:opts += ' --no-merges '
+	endif
+	if GitNewWindow("git-log") < 0 | return | endif
+	call GitExec('git log ' . l:opts)
+
+	setl syntax=git
+	noremap <silent> <buffer> [ :call GitPrev("^commit ")<CR>
+	noremap <silent> <buffer> ] :call GitNext("^commit ")<CR>
+	noremap <silent> <buffer> f 0:call GitFile(GetHash())<CR>
+	noremap <silent> <buffer> s 0:call GitShow(GetHash())<CR>
+	noremap <silent> <buffer> d 0:call GitShow(GetHash(),1)<CR>
+	noremap <silent> <buffer> <CR> 0:call GitShow(GetHash())<CR>
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
 endfu
 
 fu! GitDiff(branch)
@@ -510,7 +545,20 @@ fu! GitDiff(branch)
 	endif
 
 	setl syntax=git
-	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
+endfu
+
+fu! GitDiffCurrent()
+	if GitNewWindow("git-diff") < 0 | return | endif
+	call GitExec('git diff')
+
+	setl syntax=git
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
+
+	if wordcount().bytes == 0
+		call GitCloseWindow() | redraw
+		echo "No changes"
+	endif
 endfu
 
 fu! GitCheckout(branch)
@@ -520,7 +568,7 @@ fu! GitCheckout(branch)
 	endif
 
 	call GitExec('git checkout ' . a:branch)
-	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
 endfu
 
 fu! GitShow(hash, ...)
@@ -538,7 +586,7 @@ fu! GitShow(hash, ...)
 	setl syntax=diff
 	noremap <silent> <buffer> [ :call GitPrev("^diff ")<CR>
 	noremap <silent> <buffer> ] :call GitNext("^diff ")<CR>
-	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
 endfu
 
 fu! GitFile(hash)
@@ -546,12 +594,14 @@ fu! GitFile(hash)
 	if GitNewWindow(a:hash) < 0 | return | endif
 
 	call GitExec('git show -p ' . a:hash . ':./' . b:file)
-	noremap <silent> <buffer> q :close<CR>:call GitResize()<CR>
+	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
 endfu
 
-nnoremap <silent> \ :call Calc(input("Calculate: "))<CR>
+nnoremap <silent> g\ :call Calc(input("Calculate: "))<CR>
 nnoremap <silent> <CR> :call CheckSymbol(expand("<cWORD>"))<CR>
+nnoremap <silent> gd :call GitDiff(input("Diff branch: "))<CR>
+nnoremap <silent> gD :call GitDiffCurrent()<CR>
+nnoremap <silent> gc :call GitCheckout(input("Checkout branch: "))<CR>
 noremap <silent> gb :call GitBlame()<CR>
-noremap <silent> gc :call GitCheckout(input("Checkout Branch: "))<CR>
-noremap <silent> gd :call GitDiff(input("Diff Branch: "))<CR>
 noremap <silent> gl :call GitFullLog()<CR>
+noremap <silent> gL :call GitFullLogAll()<CR>
