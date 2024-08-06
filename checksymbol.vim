@@ -1,4 +1,4 @@
-" Symbol checker 0.60
+" Symbol checker 0.62
 " ====================================================
 " '<CR>' : Display hexadecimal and binary values
 "          Check current kernel configuration (.config)
@@ -46,7 +46,7 @@ fu! Bitwise(var1, var2, one, two)
 	let p1 = strlen(b1) - 1
 	let p2 = strlen(b2) - 1
 	let result = ""
-        while p1 >= 0 || p2 >= 0
+	while p1 >= 0 || p2 >= 0
 		let bit = strpart(b1, p1, 1) + strpart(b2, p2, 1)
 		if bit == 0
 			let result = "0" . result
@@ -79,15 +79,15 @@ endfu
 
 fu! Bin2Num(bin)
 	let i = 0
-        let num = 0
+	let num = 0
 	let len = strlen(a:bin)
-        while i < len
+	while i < len
 		let c = strpart(a:bin,i,1)
 		let i += 1
 		if c !~ '[01]' | continue | endif
-                let num = num * 2 + c
-        endw
-        return printf("%u",num)
+		let num = num * 2 + c
+	endw
+	return printf("%u",num)
 endfu
 
 fu! Num2Bin(var)
@@ -346,7 +346,7 @@ fu! GitCloseWindow()
 	winc =
 endfu
 
-fu! GitNewWindow(title)
+fu! _GitNewWindow(title, resize)
 	if exists('b:file')
 		let l:path = b:path
 		let l:file = b:file
@@ -358,14 +358,18 @@ fu! GitNewWindow(title)
 		let l:file = fnameescape(expand("%:t"))
 	endif
 
-	if g:git_window == "none"
-		enew
-	elseif g:git_window == "vert"
-		vert bot new
+	if a:resize == 1
+		if g:git_window == "none"
+			enew
+		elseif g:git_window == "vert"
+			vert bot new
+		else
+			bot new
+		endif
+		call GitResize()
 	else
-		bot new
+		vert new
 	endif
-	call GitResize()
 
 	setl buftype=nowrite bufhidden=wipe nobuflisted noswapfile nowrap
 	let b:path = l:path
@@ -382,6 +386,10 @@ fu! GitNewWindow(title)
 	endwh
 	exec "file " . l:buf
 	return 0
+endfu
+
+fu! GitNewWindow(title)
+	return _GitNewWindow(a:title, 1)
 endfu
 
 fu! GitExec(cmd)
@@ -536,6 +544,14 @@ fu! GitFullLogAll()
 	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
 endfu
 
+fu! GitGetPath()
+	if empty(expand("%:t"))
+		return -1
+	endif
+	let l:filepath = fnameescape(expand("%:p"))
+	return system('git ls-files --full-name ' . l:filepath)
+endfu
+
 fu! GitDiff(branch)
 	if GitNewWindow("git-diff") < 0 | return | endif
 	if exists('b:file')
@@ -548,9 +564,17 @@ fu! GitDiff(branch)
 	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
 endfu
 
-fu! GitDiffCurrent()
-	if GitNewWindow("git-diff") < 0 | return | endif
-	call GitExec('git diff')
+fu! GitDiffFile(branch)
+	if a:branch == ""
+		let l:branch = "HEAD"
+	else
+		let l:branch = a:branch
+	endif
+	let l:filepath = GitGetPath()
+	diffthis
+	if _GitNewWindow(l:branch, 0) < 0 | return | endif
+	call GitExec('git show ' . l:branch . ':' . l:filepath)
+	diffthis
 
 	setl syntax=git
 	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
@@ -599,8 +623,9 @@ endfu
 
 nnoremap <silent> g\ :call Calc(input("Calculate: "))<CR>
 nnoremap <silent> <CR> :call CheckSymbol(expand("<cWORD>"))<CR>
-nnoremap <silent> gd :call GitDiff(input("Diff branch: "))<CR>
-nnoremap <silent> gD :call GitDiffCurrent()<CR>
+nnoremap <silent> gs :call GitDiff(input("Diff branch: "))<CR>
+nnoremap <silent> gd :call GitDiffFile("HEAD")<CR>
+nnoremap <silent> gD :call GitDiffFile(input("Diff branch: "))<CR>
 nnoremap <silent> gc :call GitCheckout(input("Checkout branch: "))<CR>
 noremap <silent> gb :call GitBlame()<CR>
 noremap <silent> gl :call GitFullLog()<CR>
