@@ -371,10 +371,9 @@ fu! _GitNewWindow(title, resize)
 		vert new
 	endif
 
-	setl buftype=nowrite bufhidden=wipe nobuflisted noswapfile nowrap
+	setl buftype=nowrite bufhidden=wipe nobuflisted noswapfile nowrap incsearch noeol
 	let b:path = l:path
 	let b:file = l:file
-	setl incsearch
 
 	let l:bufproto = a:title . ":" . b:file
 	let l:buf= l:bufproto
@@ -400,7 +399,8 @@ fu! GitExec(cmd)
 		let l:cmd_cd = "cd " . b:path . ";"
 	endif
 
-	silent! execute "0read ! " . l:cmd_cd . a:cmd
+	silent! execute "read ! " . l:cmd_cd . a:cmd
+	silent! execute "0d_"
 	setl noma | 1
 endfu
 
@@ -571,10 +571,8 @@ fu! GitDiffFile(branch)
 		let l:branch = a:branch
 	endif
 	let l:filepath = GitGetPath()
-	diffthis
 	if _GitNewWindow(l:branch, 0) < 0 | return | endif
 	call GitExec('git show ' . l:branch . ':' . l:filepath)
-	diffthis
 
 	setl syntax=git
 	noremap <silent> <buffer> q :call GitCloseWindow()<CR>
@@ -583,6 +581,11 @@ fu! GitDiffFile(branch)
 		call GitCloseWindow() | redraw
 		echo "No changes"
 	endif
+
+	wincmd p
+	diffthis
+	wincmd p
+	diffthis
 endfu
 
 fu! GitCheckout(branch)
